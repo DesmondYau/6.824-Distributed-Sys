@@ -1,159 +1,116 @@
 #include <iostream>
 #include <queue>
 #include <chrono>
-#include "../include/buttonrpc-master/buttonrpc.hpp"
-
-const int timeoutSec { 10 };
-
-enum class TaskState { 
-    unassigned, 
-    assigned, 
-    completed 
-};
-
-enum class TaskType { 
-    mapTask, 
-    reduceTask, 
-    emptyTask, 
-    completeTask 
-};
-
-struct Task
-{
-    int taskID_;
-    std::string fileName_;
-    TaskType taskType_;
-    TaskState taskState;
-    std::chrono::steady_clock::time_point deadline;
-
-    // Implementation for buttonrpc
-    friend Serializer& operator >> (Serializer& in, Task& d) {
-		in >> d.taskID_ >> d.fileName_ >> d.taskType_ >> d.taskState >> d.deadline;
-		return in;
-	}
-
-    // Implementation for buttonrpc
-	friend Serializer& operator << (Serializer& out, Task& d) {
-		out << d.taskID_ << d.fileName_ << d.taskType_ << d.taskState << d.deadline;
-		return out;
-	}
-};
-using TaskPtr = std::unique_ptr<Task>;
-
-
-class Master
-{
-public:
-    Master(int mapCount, int reduceCount, const std::vector<std::string>& fileNames);
-    int getReduceCount();
-    Task requestTask();
-  
-private:
-    std::queue<TaskPtr> unassignedMapTasks_;   
-    std::queue<TaskPtr> unassignedReduceTasks_;                  
-    std::queue<TaskPtr> assignedTasks_;                  
-    int mapRemaining_;
-    int reduceRemaining_;
-    int reduceCount_;
-};
+#include "master.hpp"
 
 Master::Master(int mapCount, int reduceCount, const std::vector<std::string>& fileNames)
-    : mapRemaining_ { mapCount }
-    , reduceRemaining_ { reduceCount }
-    , reduceCount_ { reduceCount }
+    : m_mapRemaining { mapCount }
+    , m_reduceRemaining { reduceCount }
+    , m_reduceCount { reduceCount }
 {
     for (int i=0; i<mapCount; i++)
     {
-        TaskPtr taskPtr { std::make_unique<Task>(
-            i,
-            fileNames[i],
-            TaskType::mapTask,
-            TaskState::unassigned,
-            std::chrono::steady_clock::time_point {}
-        )};
-        
-        unassignedMapTasks_.push(std::move(taskPtr));
+        m_mapTasks.emplace_back(std::make_shared<Task>(i, fileNames[i], TaskType::MAPTASK));
     }
 
     for (int i=0; i<reduceCount; i++)
     {
-        TaskPtr taskPtr { std::make_unique<Task>(
-            i,
-            "",
-            TaskType::mapTask,
-            TaskState::unassigned,
-            std::chrono::steady_clock::time_point {}
-        )};
-        
-        unassignedReduceTasks_.push(std::move(taskPtr));
+        m_reduceTasks.emplace_back(std::make_shared<Task>(i, "", TaskType::REDUCETASK));
     }
 }
 
-int Master::getReduceCount()
-{
-    return reduceCount_;
-}
 
-Task Master::requestTask()
+Task Master::getTaskForWorker()
 {
-    if (mapRemaining_)
+    Task::ptr taskPtr;
+
+    if (m_mapRemaining > 0)
     {
-        if (!unassignedMapTasks_.empty())
-        {
-            TaskPtr taskPtr = std::move(unassignedMapTasks_.front());
-            taskPtr->deadline = std::chrono::steady_clock::now() + std::chrono::seconds(timeoutSec);
-
-            Task task { *taskPtr };
-            assignedTasks_.push(std::move(taskPtr));
-
-            return task;
-        }
-        else
-            return Task{ -1, "", TaskType::emptyTask, TaskState::completed, std::chrono::steady_clock::time_point{} };
+        taskPtr = selectMapTask();
     }
+    else if (m_reduceRemaining > 0)
+    {
+        taskPtr = selectReduceTask() ;
+    }
+    else
+    {
+        taskPtr = std::make_shared<Task>(-1, "", TaskType::COMPLETETASK);
+    }
+    return *taskPtr;
+}
+
+Task::ptr Master::selectMapTask()
+{
+    std::lock_guard<std::mutex> lockGuard(m_mapMutex);
+
+    for (auto& i : m_mapTasks)
+    {
+        if (i->getTaskState() == TaskState::UNASSIGNED)
+        {
+            i->setTaskState(TaskState::ASSIGNED);
+            i->setTaskDeadline(std::chrono::steady_clock::now() + std::chrono::seconds(TASK_TIME_OUT_SEC));
+            return i;
+        }
+    }
+    return std::make_shared<Task>(-1, "", TaskType::EMPTYTASK);
+}
+
+Task::ptr Master::selectReduceTask()
+{
+    std::lock_guard<std::mutex> lockGuard(m_reduceMutex);
     
-    if (reduceRemaining_)
+    for (auto& i : m_reduceTasks)
     {
-        if (!unassignedReduceTasks_.empty())
+        if (i->getTaskState() == TaskState::UNASSIGNED)
         {
-            TaskPtr taskPtr = std::move(unassignedReduceTasks_.front());
-            taskPtr->deadline = std::chrono::steady_clock::now() + std::chrono::seconds(timeoutSec);
-            
-            Task task { *taskPtr };
-            assignedTasks_.push(std::move(taskPtr));
-
-            return task;
+            i->setTaskState(TaskState::ASSIGNED);
+            i->setTaskDeadline(std::chrono::steady_clock::now() + std::chrono::seconds(TASK_TIME_OUT_SEC));
+            return i;
         }
-        else
-            return Task{ -1, "", TaskType::emptyTask, TaskState::completed, std::chrono::steady_clock::time_point{} };
     }
-
-    return Task{ -1, "", TaskType::completeTask, TaskState::completed, std::chrono::steady_clock::time_point{} };
+    return std::make_shared<Task>(-1, "", TaskType::EMPTYTASK);
 }
 
+void Master::reportMapComplete(int taskId)
+{
+    for (auto& i : m_reduceTasks)
+    {
+        if (i->getTaskId() == taskId)
+            i->setTaskState(TaskState::COMPLETED);
+    }
+}
 
 int main(int argc, char* argv[])
 {
     if (argc < 3)
     {
-        std::cout << "Missing parameter! Input format is './master <number of reduce tasks> ../testfiles/pg*.txt'" << std::endl;
+        std::cout << "Missing parameter! Input format is './master <number of reduce tasks> ../tests/pg*.txt'" << std::endl;
         return 1;
     }
 
-    // Parse arguments
+    /*
+        Parse arguments
+    */ 
     int mapCount { argc - 2 };
     int reduceCount { std::stoi(argv[1])};
+
     std::vector<std::string> fileNames;
     for (int i=2; i<argc; i++) {
         fileNames.push_back(argv[i]);
     }
 
-    // Initialize master and RPC server
+
+    /*
+        Initialize master 
+    */ 
+    Master master { mapCount, reduceCount, fileNames };
+
     buttonrpc server;
     server.as_server(5555);
-    Master master { mapCount, reduceCount, fileNames };   
-    server.bind("requestTask", &Master::requestTask, &master); 
+    server.bind("getTaskForWorker", &Master::getTaskForWorker, &master); 
     server.bind("getReduceCount", &Master::getReduceCount, &master); 
+    server.bind("reportMapComplete", &Master::reportMapComplete, &master); 
+
 
     // Run RPC server
     std::cout << "Starting server on RPC server on port 5555" << std::endl;
@@ -161,3 +118,6 @@ int main(int argc, char* argv[])
 
     return 0;
 }
+
+// g++-13 -std=c++23 master.cpp -o master -lzmq 
+// ./master <number of reduce tasks> ../tests/pg*.txt

@@ -1,49 +1,10 @@
 #include <iostream>
 #include <fstream>
 #include <dlfcn.h>
-#include "../include/buttonrpc-master/buttonrpc.hpp"
-#include "../include/json.hpp"
+#include <thread>
+#include <chrono>
+#include "worker.hpp"
 
-enum class TaskState { 
-    unassigned, 
-    assigned, 
-    completed 
-};
-
-enum class TaskType { 
-    mapTask, 
-    reduceTask, 
-    emptyTask, 
-    completeTask 
-};
-
-struct Task
-{
-    int taskID_;
-    std::string fileName_;
-    TaskType taskType_;
-    TaskState taskState;
-    std::chrono::steady_clock::time_point deadline;
-
-    friend Serializer& operator >> (Serializer& in, Task& d) {
-		in >> d.taskID_ >> d.fileName_ >> d.taskType_ >> d.taskState >> d.deadline;
-		return in;
-	}
-
-	friend Serializer& operator << (Serializer& out, Task& d) {
-		out << d.taskID_ << d.fileName_ << d.taskType_ << d.taskState << d.deadline;
-		return out;
-	}
-};
-
-struct KeyValuePair
-{
-    std::string key_;
-    std::string value_;
-};
-
-using MapFunc = std::vector<KeyValuePair>(*)(const std::string& filename, const std::string& contents);
-using ReduceFunc = std::string(*)(const std::string& key, const std::vector<std::string> values);
 
 int ihash(const std::string& key) {
     const uint32_t fnv_prime = 16777619u;
@@ -113,10 +74,13 @@ int main(int argc, char* argv[])
 {
     if (argc < 2)
     {
-        std::cout << "Usage: ./worker ../testfiles/xxx.so";
+        std::cout << "Usage: ./worker ../tests/xxx.so";
         return 1;
     }
 
+    /*
+        Load map and reduce function from shared object file
+    */
     // Load shared object file
     void* handle = dlopen(argv[1], RTLD_LAZY);
     if (!handle)
@@ -141,24 +105,49 @@ int main(int argc, char* argv[])
         return 1;
     }
 
+
+    /*
+        Initialize rpc client
+    */
     buttonrpc client;
 	client.as_client("127.0.0.1", 5555);
 
+    
+    /*
 
-    Task task = client.call<Task>("requestTask").val();
-    int reduceCount = client.call<int>("getReduceCount").val();
-    if (task.taskType_ == TaskType::mapTask)
+    */
+    bool completed { false };
+
+    while(!completed)
     {
-        doMapTask(task.fileName_, mapFunc, reduceCount, task.taskID_);
-        // reportMapComplete(task.taskID_);
-    }
-    else if (task.taskType_ == TaskType::reduceTask)
-    {
-        // doReduceTask(task.taskID_, reduceFunc);
-        // reportReduceComplete(task.taskID_);
+        Task task { client.call<Task>("getTaskForWorker").val() };
+        int reduceCount { client.call<int>("getReduceCount").val() };
+        std::cout << task.getTaskId() << std::endl;
+        
+        if (task.getTaskType() == TaskType::MAPTASK)
+        {
+            doMapTask(task.getFileName(), mapFunc, reduceCount, task.getTaskId());
+            client.call<void>("reportMapComplete", task.getTaskId());
+        }
+        else if (task.getTaskType() == TaskType::REDUCETASK)
+        {
+            // doReduceTask(task.taskID_, reduceFunc);
+            // reportReduceComplete(task.taskID_);
+        }
+        else if (task.getTaskType() == TaskType::EMPTYTASK)
+        {
+            std::this_thread::sleep_for(std::chrono::seconds(5));
+        }
+        else if (task.getTaskType() == TaskType::COMPLETETASK)
+        {
+            completed = true;
+        }
     }
     
 
     return 0;
 	
 }
+
+// g++-13 -std=c++23 worker.cpp -o worker -lzmq -ldl
+// ./worker ../tests/xxx.so
