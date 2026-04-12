@@ -81,3 +81,132 @@ else
   echo '---' indexer test: FAIL
   failed_any=1
 fi
+
+
+echo '***' Starting map parallelism test.
+rm -f mr-out* mr-worker*
+
+../../build/master 1 ../pg*.txt &
+sleep 1
+
+../../build/worker ../mtiming.so &
+../../build/worker ../mtiming.so &
+
+wait
+
+NT=`cat mr-out* | grep '^times-' | wc -l | sed 's/ //g'`
+if [ "$NT" != "2" ]
+then
+  echo '---' saw "$NT" workers rather than 2
+  echo '---' map parallelism test: FAIL
+  failed_any=1
+else
+  echo '---' map parallelism test: PASS
+fi
+
+
+# ----------------------------------------------- 3. Map Parallelism Test ----------------------------------------------------
+
+echo '***' Starting map parallelism test.
+rm -f mr-out* mr-worker*
+
+../../build/master 8 ../pg*.txt &
+sleep 1
+
+../../build/worker ../mtiming.so &
+../../build/worker ../mtiming.so &
+
+wait
+
+NT=`cat mr-out* | grep '^times-' | wc -l | sed 's/ //g'`
+if [ "$NT" != "2" ]
+then
+  echo '---' saw "$NT" workers rather than 2
+  echo '---' map parallelism test: FAIL
+  failed_any=1
+else
+  echo '---' map parallelism test: PASS
+fi
+
+
+# ----------------------------------------------- 4. Reduce Parallelism Test ----------------------------------------------------
+
+echo '***' Starting reduce parallelism test.
+rm -f mr-out* mr-worker*
+
+../../build/master 8 ../pg*.txt &
+sleep 1
+
+../../build/worker ../rtiming.so &
+../../build/worker ../rtiming.so &
+
+wait
+
+NT=`cat mr-out* | grep '^[a-z] 2' | wc -l | sed 's/ //g'`
+if [ "$NT" -lt "2" ]
+then
+  echo '---' too few parallel reduces.
+  echo '---' reduce parallelism test: FAIL
+  failed_any=1
+else
+  echo '---' reduce parallelism test: PASS
+fi
+
+
+# ----------------------------------------------- 5. Crash Test ----------------------------------------------------
+
+echo '***' Starting crash test.
+
+# generate the correct output
+../mrsequential ../nocrash.so ../pg*txt || exit 1
+sort mr-out-0 > mr-correct-crash.txt
+rm -f mr-out
+
+rm -f mr-done
+(timeout -k 2s 180s ../../build/master 8 ../pg*txt ; touch mr-done ) &
+sleep 1
+
+# start multiple workers
+timeout -k 2s 180s ../../build/worker ../crash.so &
+
+# mimic rpc.go's masterSock()
+# SOCKNAME=/var/tmp/824-mr-`id -u`
+
+( while [ ! -f mr-done ]
+  do
+    timeout -k 2s 180s ../../build/worker ../crash.so
+    sleep 1
+  done ) &
+
+( while [ ! -f mr-done ]
+  do
+    timeout -k 2s 180s ../../build/worker ../crash.so
+    sleep 1
+  done ) &
+
+while [ ! -f mr-done ]
+do
+  timeout -k 2s 180s ../../build/worker ../crash.so
+  sleep 1
+done
+
+wait
+wait
+wait
+
+sort mr-out* | grep . > mr-crash-all
+if cmp mr-crash-all mr-correct-crash.txt
+then
+  echo '---' crash test: PASS
+else
+  echo '---' crash output is not the same as mr-correct-crash.txt
+  echo '---' crash test: FAIL
+  failed_any=1
+fi
+
+if [ $failed_any -eq 0 ]; then
+    echo '***' PASSED ALL TESTS
+else
+    echo '***' FAILED SOME TESTS
+    exit 1
+fi

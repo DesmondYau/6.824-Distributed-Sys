@@ -33,12 +33,25 @@ int main(int argc, char* argv[])
     std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
     std::cout << "Master listening on port 5555" << std::endl;
     
+    /*
+        Start a separate thread to monitor reset task to UNASSIGNED if task exceeds deadline
+    */
+    std::thread taskResetThread([&master]() {
+        while (master.getMapRemaining() != 0 || master.getReduceRemaining() != 0) 
+        {
+            master.refreshMapTaskState();
+            master.refreshReduceTaskState();
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+        }
+    });
+
 
     /*
         Start a separate thread to monitor when to exit master
     */
-    std::thread monitorThread([&master, &service]() {
-        while (true) {
+    std::thread monitorThread([&master, &server]() {
+        while (true) 
+        {
             if (master.getMapRemaining() == 0 && master.getReduceRemaining() == 0)
             {
                 std::cout << "All map and reduce tasks completed. Shutting down master server..." << std::endl;
@@ -54,6 +67,7 @@ int main(int argc, char* argv[])
     server->Wait();
 
     // Join monitor thread before exiting
+    taskResetThread.join();
     monitorThread.join();
     return 0;
 }

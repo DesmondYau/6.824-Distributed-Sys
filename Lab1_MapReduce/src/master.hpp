@@ -103,14 +103,14 @@ public:
      * 
      * const is not used since buttonrpc does not support template overlaods for const member function pointer
      */
-    int getMapRemaining() { return m_mapRemaining.load(); }
+    int getMapRemaining() { return m_mapRemaining; }
 
      /**
      * @brief Return number of reduce task remaining
      * 
      * const is not used since buttonrpc does not support template overlaods for const member function pointer
      */
-    int getReduceRemaining() { return m_reduceRemaining.load(); }
+    int getReduceRemaining() { return m_reduceRemaining; }
 
     /**
      * @brief Return total number of map task 
@@ -156,14 +156,24 @@ public:
      */
     void reportReduceComplete(int taskId);
 
+    /**
+     * @brief Reset map task state to UNASSIGNED if task exceeds deadline
+     */
+    void refreshMapTaskState();
+
+    /**
+     * @brief Reset reduce task state to UNASSIGNED if task exceeds deadline
+     */
+    void refreshReduceTaskState();
+
     
 
   
 private:
     std::vector<Task::ptr> m_mapTasks {};  
     std::vector<Task::ptr> m_reduceTasks {};              
-    std::atomic<int> m_mapRemaining {};
-    std::atomic<int> m_reduceRemaining {};
+    int m_mapRemaining {};
+    int m_reduceRemaining {};
     int m_mapCount {};
     int m_reduceCount {};
     std::mutex m_Mutex {};

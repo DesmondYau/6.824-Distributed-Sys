@@ -102,3 +102,32 @@ void Master::reportReduceComplete(int taskId)
     }
 }
 
+void Master::refreshMapTaskState() 
+{
+    std::lock_guard<std::mutex> lockGuard(m_Mutex);
+
+    for (auto& taskPtr : m_mapTasks)
+    {
+        if (taskPtr->getTaskState() == TaskState::ASSIGNED && taskPtr->getDeadline() < std::chrono::steady_clock::now())
+        {
+            std::cout << "Deadline for map task " << taskPtr->getTaskID() << " exceeded. Reset to UNASSIGNED" << std::endl;
+            taskPtr->setTaskState(TaskState::UNASSIGNED);
+        } 
+    }
+}
+
+
+void Master::refreshReduceTaskState()
+{
+    std::lock_guard<std::mutex> lockGuard(m_Mutex);
+
+    for (auto& taskPtr : m_reduceTasks)
+    {
+        if (taskPtr->getTaskState() == TaskState::ASSIGNED && taskPtr->getDeadline() < std::chrono::steady_clock::now())
+        {
+            std::cout << "Deadline for map task " << taskPtr->getTaskID() << " exceeded. Reset to UNASSIGNED" << std::endl;
+            taskPtr->setTaskState(TaskState::UNASSIGNED);
+        } 
+    }
+        
+} 
