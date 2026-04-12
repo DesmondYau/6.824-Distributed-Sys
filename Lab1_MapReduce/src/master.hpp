@@ -5,7 +5,7 @@
 #include <vector>
 #include <mutex>
 #include <atomic>
-#include "../include/buttonrpc-master/buttonrpc.hpp"
+
 
 const int TASK_TIME_OUT_SEC { 10 };
 
@@ -31,7 +31,7 @@ public:
      * @brief Default constructor for RPC
      */
     Task()
-        : m_taskId { -1 }
+        : m_taskID { -1 }
         , m_fileName { "" }
         , m_taskType { TaskType::EMPTYTASK }
     {}
@@ -39,32 +39,16 @@ public:
     /**
      * @brief Constructor
      */
-    Task(int taskId, std::string fileName, TaskType TaskType)
-        : m_taskId { taskId }
+    Task(int taskID, std::string fileName, TaskType TaskType)
+        : m_taskID { taskID }
         , m_fileName { fileName }
         , m_taskType { TaskType }
     {}
 
     /**
-     * @brief Implementation for buttonrpc
-     */
-    friend Serializer& operator>> (Serializer& in, Task& d) {
-		in >> d.m_taskId >> d.m_fileName >> d.m_taskType >> d.m_taskState >> d.m_deadline;
-		return in;
-	}
-
-    /**
-     * @brief Implementation for buttonrpc
-     */
-	friend Serializer& operator<< (Serializer& out, Task& d) {
-		out << d.m_taskId << d.m_fileName << d.m_taskType << d.m_taskState << d.m_deadline;
-		return out;
-	}
-
-    /**
      * @brief Return task id
      */
-    int getTaskId() const { return m_taskId; }
+    int getTaskID() const { return m_taskID; }
 
     /**
      * @brief Return filename of task
@@ -98,7 +82,7 @@ public:
 
 
 private:
-    int m_taskId {};
+    int m_taskID {};
     std::string m_fileName {};
     TaskType m_taskType {};
     TaskState m_taskState { TaskState::UNASSIGNED };
@@ -127,7 +111,6 @@ public:
      * const is not used since buttonrpc does not support template overlaods for const member function pointer
      */
     int getReduceRemaining() { return m_reduceRemaining.load(); }
-
 
     /**
      * @brief Return total number of map task 

@@ -1,0 +1,40 @@
+syntax ="proto3";
+package mapreduce;
+
+message Task {
+    int32 taskID = 1;
+    string fileName = 2;
+    enum TaskType {
+        MAPTASK = 0;
+        REDUCETASK = 1;
+        EMPTYTASK = 2;
+        COMPLETETASK = 3;
+        
+    }
+    TaskType taskType = 3;
+    enum TaskState {
+        UNASSIGNED = 0;
+        ASSIGNED = 1;
+        COMPLETED = 2;
+    }
+    TaskState taskState = 4;
+}
+
+message Empty {}
+
+message CountReply {
+    int32 count = 1;
+}
+
+message TaskIdRequest {
+    int32 taskId = 1;
+}
+
+
+service MasterService {
+    rpc GetTaskForWorker(Empty) returns (Task);
+    rpc GetReduceCount(Empty) returns (CountReply);
+    rpc ReportMapComplete(TaskIdRequest) returns (Empty);
+    rpc GetMapCount(Empty) returns (CountReply);
+    rpc ReportReduceComplete(TaskIdRequest) returns (Empty);
+}

@@ -4,6 +4,9 @@
 #include <thread>
 #include <chrono>
 #include <unistd.h>
+#include <grpcpp/grpcpp.h>
+#include "proto/master.grpc.pb.h"
+#include "proto/master.pb.h"
 #include "worker.hpp"
 
 
@@ -17,6 +20,22 @@ int ihash(const std::string& key) {
     }
 
     return static_cast<int>(hash & 0x7fffffff);
+}
+
+int getReduceCount(std::unique_ptr<mapreduce::MasterService::Stub>& stub) {
+    grpc::ClientContext ctx;
+    mapreduce::Empty req;
+    mapreduce::CountReply reply;
+    grpc::Status status = stub->GetReduceCount(&ctx, req, &reply);
+    return status.ok() ? reply.count() : -1;
+}
+
+int getMapCount(std::unique_ptr<mapreduce::MasterService::Stub>& stub) {
+    grpc::ClientContext ctx;
+    mapreduce::Empty req;
+    mapreduce::CountReply reply;
+    grpc::Status status = stub->GetMapCount(&ctx, req, &reply);
+    return status.ok() ? reply.count() : -1;
 }
 
 void writeMapOutput(std::vector<KeyValuePair> intermediate, int reduceCount, int taskID)
@@ -81,7 +100,7 @@ void doReduceTask(int taskID, ReduceFunc reduceFunc, int mapCount)
             KeyValuePair kv;
             nlohmann::json j = nlohmann::json::parse(line);
             kv.key_ = j["key"].get<std::string>();
-            kv.value_ = j["value"].get<string>();
+            kv.value_ = j["value"].get<std::string>();
             intermediate.emplace_back(kv);
         }
     }
@@ -113,17 +132,27 @@ void doReduceTask(int taskID, ReduceFunc reduceFunc, int mapCount)
     }
 }
 
-std::string taskTypeToString(TaskType state) {
-    switch (state) {
-        case TaskType::EMPTYTASK : return "EMPTYTASK";
-        case TaskType::COMPLETETASK:   return "COMPLETETASK";
-        case TaskType::MAPTASK:  return "MAPTASK";
-        case TaskType::REDUCETASK: return "REDUCETASK";
-        default: return "UNKNOWN";
+void reportMapComplete(std::unique_ptr<mapreduce::MasterService::Stub>& stub, int taskId) {
+    mapreduce::TaskIdRequest req;
+    req.set_taskid(taskId);
+    grpc::ClientContext ctx;
+    mapreduce::Empty resp;
+    grpc::Status status = stub->ReportMapComplete(&ctx, req, &resp);
+    if (!status.ok()) {
+        std::cerr << "ReportMapComplete RPC failed: " << status.error_message() << std::endl;
     }
 }
 
-
+void reportReduceComplete(std::unique_ptr<mapreduce::MasterService::Stub>& stub, int taskId) {
+    mapreduce::TaskIdRequest req;
+    req.set_taskid(taskId);
+    grpc::ClientContext ctx;
+    mapreduce::Empty resp;
+    grpc::Status status = stub->ReportReduceComplete(&ctx, req, &resp);
+    if (!status.ok()) {
+        std::cerr << "ReportReduceComplete RPC failed: " << status.error_message() << std::endl;
+    }
+}
 
 int main(int argc, char* argv[])
 {
@@ -134,7 +163,7 @@ int main(int argc, char* argv[])
     }
 
     /*
-        Load map and reduce function from shared object file
+        1. Load map and reduce function from shared object file
     */
     // Load shared object file
     void* handle = dlopen(argv[1], RTLD_LAZY);
@@ -162,64 +191,63 @@ int main(int argc, char* argv[])
 
 
     /*
-        Initialize rpc client
+        2. Initialize gRPC client
     */
-    buttonrpc client;
-	client.as_client("127.0.0.1", 5555);
-    client.set_timeout(5000);
+    auto channel = grpc::CreateChannel("127.0.0.1:5555", grpc::InsecureChannelCredentials());
+    std::unique_ptr<mapreduce::MasterService::Stub> stub = mapreduce::MasterService::NewStub(channel);
     std::cout << "Starting Worker process ID: " << getpid() << std::endl;
 
     
     /*
-        Worker handle map task and reduce task
+        3. Worker handle map task and reduce task
     */
     bool completed { false };
 
     while(!completed)
     {
+        
+        grpc::ClientContext context;
+        mapreduce::Empty request;
+        mapreduce::Task task;
+
         // Worker requesting task from master
-        auto result { client.call<Task>("getTaskForWorker") };
-        if (result.error_code() != buttonrpc::RPC_ERR_SUCCESS)
+        grpc::Status status = stub->GetTaskForWorker(&context, request, &task);
+        if (!status.ok())
         {
-            std::cerr << "RPC failed: " << result.error_msg() << ". Worker exiting" << std::endl;
+            std::cerr << "RPC failed: " << status.error_message() << ". Worker exiting..." << std::endl;
             return 1;
         }
-        Task task { result.val() };
-        int reduceCount { client.call<int>("getReduceCount").val() };
-        int mapCount { client.call<int>("getMapCount").val() };
-        std::cout << "Requested task " << task.getTaskId() << "" << taskTypeToString(task.getTaskType()) << std::endl;
 
-        if (task.getTaskType() == TaskType::MAPTASK)
+        // Get total number of map tasks and reduces tasks
+        int reduceCount = getReduceCount(stub);
+        int mapCount = getMapCount(stub);
+
+        // Perform respective task according to task type
+        if (task.tasktype() == mapreduce::Task::MAPTASK)
         {
-            std::cout << "Worker process ID: " << getpid() << " working on map task " << task.getTaskId() << std::endl;
-            doMapTask(task.getFileName(), mapFunc, reduceCount, task.getTaskId());
-            std::cout << "Worker process ID: " << getpid() << " completed map task " << task.getTaskId() << std::endl;
-            client.call<void>("reportMapComplete", task.getTaskId());
+            doMapTask(task.filename(), mapFunc, reduceCount, task.taskid());
+            reportMapComplete(stub, task.taskid());
         }
-        else if (task.getTaskType() == TaskType::REDUCETASK)
+        else if (task.tasktype() == mapreduce::Task::REDUCETASK)
         {
-            std::cout << "Worker process ID: " << getpid() << " working on reduce task " << task.getTaskId() << std::endl;
-            doReduceTask(task.getTaskId(), reduceFunc, mapCount);
-            std::cout << "Worker process ID: " << getpid() << " completed reduce task " << task.getTaskId() << std::endl;
-            client.call<void>("reportReduceComplete", task.getTaskId());
+            doReduceTask(task.taskid(), reduceFunc, mapCount);
+            reportReduceComplete(stub, task.taskid());
         }
-        else if (task.getTaskType() == TaskType::EMPTYTASK)
+        else if (task.tasktype() == mapreduce::Task::EMPTYTASK)
         {
             std::cout << "No current available tasks. Retry after 5 seconds" << std::endl;
             std::this_thread::sleep_for(std::chrono::seconds(5));
         }
-        else if (task.getTaskType() == TaskType::COMPLETETASK)
+        else if (task.tasktype() == mapreduce::Task::COMPLETETASK)
         {
             std::cout << "All map and reduce tasks completed. Worker exiting" << std::endl;
             completed = true;
             
         }
     }
-    
 
     return 0;
 	
 }
 
-// g++-13 -std=c++23 worker.cpp -o worker -lzmq -ldl
 // ./worker ../tests/xxx.so
