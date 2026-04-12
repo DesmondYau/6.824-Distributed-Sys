@@ -1,4 +1,5 @@
 <img width="1536" height="1024" alt="Copilot_20260412_215806" src="https://github.com/user-attachments/assets/baa6fbc2-a7f7-433b-99f2-8a312fdc4f47" />
+
 # MIT 6.824 Lab 1 – MapReduce (C++ Implementation)
 
 ## Overview
@@ -73,11 +74,13 @@ Two concurrent threads maintain system health:
 mkdir -p build && cd build
 cmake ..
 make
+```
 
 ### Run Tests
 There is a test-mr.sh script in the tests folder that automates running a suite of MapReduce tests for correctness and parallelism.
-``bash
+```bash
 ./tests/test-mr.sh
+```
 
 ---
 
