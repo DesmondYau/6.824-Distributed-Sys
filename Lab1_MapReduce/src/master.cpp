@@ -129,5 +129,4 @@ void Master::refreshReduceTaskState()
             taskPtr->setTaskState(TaskState::UNASSIGNED);
         } 
     }
-        
 } 
