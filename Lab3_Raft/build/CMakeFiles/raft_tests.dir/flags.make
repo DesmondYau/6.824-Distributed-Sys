@@ -6,5 +6,5 @@ CXX_DEFINES =
 
 CXX_INCLUDES = -I/6.5840/Lab3_Raft/include
 
-CXX_FLAGS = -g -std=gnu++23
+CXX_FLAGS = -fsanitize=address -fno-omit-frame-pointer -g -std=gnu++23
 

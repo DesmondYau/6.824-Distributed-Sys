@@ -16,6 +16,7 @@ public:
         DELETION,
         APPLY,
         PERSISTER,
+        SNAPSHOT,
         ERROR
     };
 
@@ -54,6 +55,7 @@ private:
             case Type::DELETION:    return "DELETION";
             case Type::APPLY:       return "APPLY";
             case Type::PERSISTER:   return "PERSISTER";
+            case Type::SNAPSHOT:    return "SNAPSHOT";
             case Type::ERROR:       return "ERROR";
         }
         return "UNKNOWN";

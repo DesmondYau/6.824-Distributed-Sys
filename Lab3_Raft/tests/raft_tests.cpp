@@ -161,6 +161,8 @@ TEST(RaftTest3B, RPCByteCount) {
     cfg.end();
 }
 
+
+
 TEST(RaftTest3B, FollowerFailure) {
     Config cfg(3, false);
     cfg.begin("Test (3B): progressive failure of followers");
@@ -292,6 +294,8 @@ TEST(RaftTest3B, FailNoAgree) {
     cfg.end();
 }
 
+
+
 TEST(RaftTest3C, Persist1) {
     Config cfg(3, false);
     cfg.begin("Test (3C): basic persistence");
@@ -341,6 +345,7 @@ TEST(RaftTest3C, Persist1) {
 }
 
 
+
 TEST(RaftTest3C, Persist2) {
     Config cfg(5, false);
     cfg.begin("Test (3C): more persistence");
@@ -363,7 +368,7 @@ TEST(RaftTest3C, Persist2) {
         cfg.one(std::to_string(10 + index), 3, true);
         index++;
 
-        // Now disconnect the current leader + 2 more followers. No more servers are alive
+        // Now disconnectma the current leader + 2 more followers. No more servers are alive
         cfg.disconnectServer((leader1 + 0) % 5);    // disconnect the current leader
         cfg.disconnectServer((leader1 + 3) % 5);
         cfg.disconnectServer((leader1 + 4) % 5);
@@ -455,7 +460,11 @@ TEST(RaftTest3C, Figure8) {
             if (cfg.getRaft(i)) {
                 auto [idx, term, ok] = cfg.getRaft(i)->start(std::to_string(rand() % 10000));
                 if (ok) 
+                {
                     leader = i;     // remember which server is currently the leader
+                    std::cout << "[test] Iter " << iters << " Sending new command to leader " << leader << "##################################################" << std::endl;
+                }
+                    
             }
         }
 
@@ -484,6 +493,8 @@ TEST(RaftTest3C, Figure8) {
                 nup++;
             }
         }
+
+
     }
 
     // After the 1000 random crash/restart cycles, bring ALL 5 servers back online.
@@ -498,6 +509,7 @@ TEST(RaftTest3C, Figure8) {
     cfg.one(std::to_string(rand() % 10000), 5, true);
     cfg.end();
 }
+
 
 
 TEST(RaftTest3C, UnreliableAgree) {
@@ -536,6 +548,7 @@ TEST(RaftTest3C, UnreliableAgree) {
 }
 
 
+
 TEST(RaftTest3C, Figure8Unreliable) {
     // 5-server cluster with unreliable network from the beginning.
     Config cfg(5, true);           // true = unreliable (drops, delays, reordering)
@@ -551,6 +564,7 @@ TEST(RaftTest3C, Figure8Unreliable) {
     // but now with packet loss, delays, and (later) long reordering.
     for (int iters = 0; iters < 1000; iters++) {
 
+        std:: cout << "[Test] Iter: " << iters << std::endl;
         // After 200 iterations, enable long reordering (very harsh condition).
         if (iters == 200) {
             cfg.setNetworkLongReordering(true);
@@ -759,4 +773,204 @@ TEST(RaftTest3C, ReliableChurn) {
 TEST(RaftTest3C, UnreliableChurn) {
     Config cfg(5, true);    // unreliable network
     internalChurn(cfg, true);
+}
+
+
+
+const int MAXLOGSIZE = 2000;
+const int SnapShotInterval = 10;   // how often we take snapshots (in number of commands)
+
+// snapcommon - the common helper used by most snapshot tests
+static void snapcommon(Config& cfg, const std::string& name, bool disconnect, bool reliable, bool crash)
+{
+    cfg.begin(name);
+
+    const int iters = 30;
+    const int servers = 3;
+
+    // Step 1: Start with one normal commit to have some initial log entries
+    cfg.one(std::to_string(rand() % 10000), servers, true);
+
+    int leader1 = cfg.checkOneLeader();
+
+    // Run 30 iterations of snapshot stress testing
+    for (int i = 0; i < iters; i++) {
+        // Decide which server will be the victim (disconnected or crashed)
+        // and which one will generate load (the sender).
+        // Alternates every 3 iterations to test different leader/follower roles.
+        int victim = (leader1 + 1) % servers;
+        int sender = leader1;
+        if (i % 3 == 1) {
+            sender = (leader1 + 1) % servers;
+            victim = leader1;
+        }
+
+        // --- Inject failure (if requested) ---
+        if (disconnect) {
+            cfg.disconnectServer(victim);
+            // Commit with reduced quorum (only the remaining servers)
+            cfg.one(std::to_string(rand() % 10000), servers - 1, true);
+        }
+
+        if (crash) {
+            cfg.crashServer(victim);
+            cfg.one(std::to_string(rand() % 10000), servers - 1, true);
+        }
+
+        // --- Generate enough commands to trigger a snapshot ---
+        // We send roughly half to full SnapShotInterval worth of entries.
+        int nn = (SnapShotInterval / 2) + (rand() % SnapShotInterval);
+        for (int j = 0; j < nn; j++) {
+            cfg.getRaft(sender)->start(std::to_string(rand() % 10000));
+        }
+
+        // Let the applier threads catch up
+        if (!disconnect && !crash) {
+            // All servers alive → commit with full 3-server quorum
+            cfg.one(std::to_string(rand() % 10000), servers, true);
+        } else {
+            // Some servers down → commit with majority (2 servers).
+            cfg.one(std::to_string(rand() % 10000), servers - 1, true);
+        }
+
+        // Safety check: ensure log is being trimmed by snapshots
+        if (cfg.logSize() >= MAXLOGSIZE) {
+            throw std::runtime_error("Log size too large");
+        }
+
+        // --- Recovery phase, the following showing happen ---
+        // 1. The leader notices that the reconnected follower is behind.
+        // 2. The leader sends an InstallSnapshot RPC to the follower (instead of normal AppendEntries).
+        // 3. The follower correctly installs the snapshot 
+        // 4. The follower catches up with any newer log entries
+        // 5. The new command is successfully replicated and committed on all servers, including the previously disconnected one.
+        if (disconnect) {
+            // Reconnect the victim. It may be far behind and needs InstallSnapshot RPC.
+            cfg.connectServer(victim);
+            cfg.one(std::to_string(rand() % 10000), servers, true);
+            leader1 = cfg.checkOneLeader();
+        }
+
+        if (crash) {
+            // Restart the crashed server (new Raft instance)
+            // It should load snapshot + remaining log via readPersist()
+            cfg.startServer(victim);
+            cfg.connectServer(victim);
+            cfg.one(std::to_string(rand() % 10000), servers, true);
+            leader1 = cfg.checkOneLeader();
+        }
+    }
+
+    cfg.end();
+}
+
+TEST(RaftTest3D, SnapshotBasic) {
+    // Basic snapshot test: no failures, reliable network.
+    // This is the simplest case to test snapshot creation and log truncation.
+    Config cfg(3, false);
+    snapcommon(cfg, "Test (3D): snapshots basic", false, true, false);
+}
+
+
+TEST(RaftTest3D, SnapshotInstall) {
+    // Tests snapshot installation when a follower is disconnected.
+    Config cfg(3, false);
+    snapcommon(cfg, "Test (3D): install snapshots (disconnect)", true, true, false);
+}
+
+TEST(RaftTest3D, SnapshotInstallUnreliable) {
+    // Tests snapshot installation under unreliable network (packet loss + delays).
+    Config cfg(3, true);
+    snapcommon(cfg, "Test (3D): install snapshots (disconnect+unreliable)", true, false, false);
+}
+
+TEST(RaftTest3D, SnapshotInstallCrash) {
+    // Tests snapshot installation when a follower is crashed and restarted.
+    Config cfg(3, false);
+    snapcommon(cfg, "Test (3D): install snapshots (crash)", false, true, true);
+}
+
+TEST(RaftTest3D, SnapshotInstallUnreliableCrash) {
+    // Tests snapshot installation under both unreliable network and crashes.
+    Config cfg(3, true);
+    snapcommon(cfg, "Test (3D): install snapshots (unreliable+crash)", false, false, true);
+}
+
+TEST(RaftTest3D, SnapshotAllCrash) {
+    // Tests that snapshots are persisted and correctly restored when ALL servers are crashed and restarted.
+    Config cfg(3, false);
+    cfg.begin("Test (3D): crash and restart all servers");
+
+    cfg.one(std::to_string(rand() % 10000), 3, true);
+
+    const int iters = 5;
+    for (int i = 0; i < iters; i++) {
+        // Generate enough commands to trigger a snapshot
+        int nn = (SnapShotInterval / 2) + (rand() % SnapShotInterval);
+        for (int j = 0; j < nn; j++) {
+            cfg.one(std::to_string(rand() % 10000), 3, true);
+        }
+        int index1 = cfg.one(std::to_string(rand() % 10000), 3, true);
+
+        // Crash all servers
+        for (int j = 0; j < 3; j++) {
+            cfg.crashServer(j);
+        }
+
+        // Restart all servers (they should load the snapshot + remaining log)
+        for (int j = 0; j < 3; j++) {
+            cfg.startServer(j);
+            cfg.connectServer(j);
+        }
+
+        int index2 = cfg.one(std::to_string(rand() % 10000), 3, true);
+        ASSERT_GE(index2, index1 + 1) << "index decreased after full restart";
+    }
+
+    cfg.end();
+}
+
+TEST(RaftTest3D, SnapshotInit) {
+    // Tests that servers correctly initialize their in-memory state from a snapshot
+    // after a crash, and that future writes to persistent state do not lose the snapshot.
+    Config cfg(3, false);
+    cfg.begin("Test (3D): snapshot initialization after crash");
+
+    cfg.one(std::to_string(rand() % 10000), 3, true);
+
+    // Generate enough entries to trigger a snapshot
+    int nn = SnapShotInterval + 1;
+    for (int i = 0; i < nn; i++) {
+        cfg.one(std::to_string(rand() % 10000), 3, true);
+    }
+
+    // Crash all servers
+    for (int i = 0; i < 3; i++) {
+        cfg.crashServer(i);
+    }
+
+    // Restart all servers
+    for (int i = 0; i < 3; i++) {
+        cfg.startServer(i);
+        cfg.connectServer(i);
+    }
+
+    // One more command after restart
+    cfg.one(std::to_string(rand() % 10000), 3, true);
+
+    // Crash again
+    for (int i = 0; i < 3; i++) {
+        cfg.crashServer(i);
+    }
+
+    // Restart again
+    for (int i = 0; i < 3; i++) {
+        cfg.startServer(i);
+        cfg.connectServer(i);
+    }
+
+    // Final command to trigger potential bug
+    cfg.one(std::to_string(rand() % 10000), 3, true);
+
+    cfg.end();
 }

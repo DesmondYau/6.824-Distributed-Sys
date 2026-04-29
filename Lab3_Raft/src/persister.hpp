@@ -13,16 +13,19 @@ public:
 
     Persister& operator=(const Persister& persister);
 
+    /*Operations for Raft state*/
     void saveRaftState(const std::vector<uint8_t>& state);
     std::vector<uint8_t> readRaftState();
+    size_t raftStateSize();
 
-    /*
-    int RaftStateSize();
+    /* Operations for snapshots*/
+    void saveStateAndSnapshot(const std::vector<uint8_t>& state, const std::vector<uint8_t>& snapshot);
+    std::vector<uint8_t> readSnapshot();
 
     
-    void SaveStateAndSnapshot(const std::vector<uint8_t>& state,
-                              const std::vector<uint8_t>& snapshot);
-    std::vector<uint8_t> ReadSnapshot();
+    
+
+    /*
     int SnapshotSize();
     */
 

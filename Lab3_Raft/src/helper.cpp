@@ -4,7 +4,6 @@
 #include "../include/json.hpp"
 
 
-// Note: qualify with Raft::LogEntry, not namespace Raft
 void to_json(nlohmann::json& j, const Raft::LogEntry& entry) {
     j = nlohmann::json{{"Command", entry.command}, {"Term", entry.term}};
 }
@@ -25,13 +24,26 @@ void decodeArgs(const std::string& args, Raft::AppendEntriesArgs& a)
     a.leaderCommit= j["LeaderCommit"].get<uint64_t>();
 }
 
-void decodeArgs(const std::string& args, Raft::RequestVoteArgs & a)
+void decodeArgs(const std::string& args, Raft::RequestVoteArgs& a)
 {
     nlohmann::json j = nlohmann::json::parse(args);
     a.term         = j["Term"].get<uint32_t>();
     a.candidateId  = j["CandidateId"].get<uint32_t>();
     a.lastLogIndex = j["LastLogIndex"].get<uint64_t>();
     a.lastLogTerm  = j["LastLogTerm"].get<uint32_t>();
+}
+
+// Decode String → InstallSnapshotArgs
+void decodeArgs(const std::string& args, Raft::InstallSnapshotArgs& a)
+{
+    nlohmann::json j = nlohmann::json::parse(args);
+    a.term              = j["Term"].get<uint32_t>();
+    a.leaderId          = j["LeaderId"].get<int32_t>();
+    a.lastIncludedIndex = j["LastIncludedIndex"].get<uint64_t>();
+    a.lastIncludedTerm  = j["LastIncludedTerm"].get<uint32_t>();
+    a.offset            = j["Offset"].get<int>();          
+    a.data              = j["Data"].get<std::vector<uint8_t>>();
+    a.done              = j["Done"].get<bool>();
 }
 
 std::string encodeReply(const Raft::AppendEntriesReply& r) {
@@ -48,6 +60,13 @@ std::string encodeReply(const Raft::RequestVoteReply& r)
     nlohmann::json j;
     j["Term"]        = r.term;
     j["VoteGranted"] = r.voteGranted;
+    return j.dump();
+}
+
+std::string encodeReply(const Raft::InstallSnapshotReply& r)
+{
+    nlohmann::json j;
+    j["Term"] = r.term;
     return j.dump();
 }
 
@@ -73,6 +92,20 @@ std::string encodeArgs(const Raft::RequestVoteArgs& a) {
     return j.dump();
 }
 
+// Encode InstallSnapshotArgs → String
+std::string encodeArgs(const Raft::InstallSnapshotArgs& a)
+{
+    nlohmann::json j;
+    j["Term"]             = a.term;
+    j["LeaderId"]         = a.leaderId;
+    j["LastIncludedIndex"]= a.lastIncludedIndex;
+    j["LastIncludedTerm"] = a.lastIncludedTerm;
+    j["Offset"]           = a.offset;          
+    j["Data"]             = a.data;             
+    j["Done"]             = a.done;
+    return j.dump();
+}
+
 // Decode Raft replies (String -> Raft AppendEntriesReply)
 void decodeReply(const std::string& replyStr, Raft::AppendEntriesReply& r) {
     nlohmann::json j = nlohmann::json::parse(replyStr);
@@ -80,8 +113,8 @@ void decodeReply(const std::string& replyStr, Raft::AppendEntriesReply& r) {
     r.success = j["Success"].get<bool>();
     
     // These fields are only present on failure replies
-    r.conflictIndex = j.value("ConflictIndex", uint64_t(0));
-    r.conflictTerm  = j.value("ConflictTerm", uint32_t(-1));
+    r.conflictIndex = j["ConflictIndex"].get<uint64_t>();
+    r.conflictTerm  = j["ConflictTerm"].get<uint32_t>();
 }
 
 // Decode Raft replies (String -> Raft RequestVoteReply)
@@ -89,4 +122,10 @@ void decodeReply(const std::string& replyStr, Raft::RequestVoteReply& r) {
     nlohmann::json j = nlohmann::json::parse(replyStr);
     r.term        = j["Term"].get<uint32_t>();
     r.voteGranted = j["VoteGranted"].get<bool>();
+}
+
+void decodeReply(const std::string& replyStr, Raft::InstallSnapshotReply& r)
+{
+    nlohmann::json j = nlohmann::json::parse(replyStr);
+    r.term = j["Term"].get<uint32_t>();
 }

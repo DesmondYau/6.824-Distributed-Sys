@@ -4,6 +4,7 @@
 
 Persister::Persister(const Persister& persister)
 {
+    std::lock_guard<std::mutex> lock1(persister.m_mu);
     std::lock_guard<std::mutex> lock(m_mu);
     m_raftstate = persister.m_raftstate;        // vector performs deep copy when using = operator by default;
     m_snapshot = persister.m_snapshot;
@@ -13,8 +14,8 @@ Persister& Persister::operator=(const Persister& persister)
 {
     if (this != &persister)
     {
-        std::lock_guard<std::mutex> lock1(m_mu);
         std::lock_guard<std::mutex> lock2(persister.m_mu);
+        std::lock_guard<std::mutex> lock1(m_mu);
         m_raftstate = persister.m_raftstate;
         m_snapshot = persister.m_snapshot;
     }
@@ -33,21 +34,24 @@ std::vector<uint8_t> Persister::readRaftState()
     return m_raftstate;
 }
 
+void Persister::saveStateAndSnapshot(const std::vector<uint8_t>& state, const std::vector<uint8_t>& snapshot)
+{
+    std::lock_guard<std::mutex> lock(m_mu);
+    m_raftstate = state;
+    m_snapshot = snapshot;
+}
 
+std::vector<uint8_t> Persister::readSnapshot()
+{
+    std::lock_guard<std::mutex> lock(m_mu);
+    return m_snapshot;
+}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+size_t Persister::raftStateSize()
+{
+    std::lock_guard<std::mutex> lock(m_mu);
+    return m_raftstate.size();
+}
 
 /*
 Persister::Persister(const Persister& persister) 
