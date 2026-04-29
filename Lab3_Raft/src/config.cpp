@@ -379,6 +379,11 @@ void Config::applierSnap(int i, std::shared_ptr<ApplyChannel> applyChannel)
             }
         }
 
+        //Check stop signal BEFORE blocking
+        if (m_applierStopped[i]) {
+            break;
+        }
+
         // Get the optional result
         auto optionalMsg = applyChannel->pop();   
 
