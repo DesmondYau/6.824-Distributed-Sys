@@ -5,7 +5,7 @@
 #include <chrono>
 #include <future>
 
-
+namespace labrpc {
 
 Network::Network() 
 {
@@ -169,7 +169,7 @@ void Network::deliver(const std::string& endpointName, const std::string& rpcTyp
     }
 }
 
-bool Network::isServerDead(const std::string& endpointName, const std::string& serverName, const std::shared_ptr<Server>& server) 
+bool Network::isServerDead(const std::string& endpointName, const std::string& serverName, const std::shared_ptr<labrpc::Server>& server) 
 {
     std::lock_guard<std::mutex> lock(m_mu);
 
@@ -259,4 +259,6 @@ void Network::cleanup()
     m_enabledMap.clear(); 
     m_done = true;
     m_cv.notify_all();
+}
+
 }

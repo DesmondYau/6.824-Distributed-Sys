@@ -5,8 +5,10 @@
 #include <mutex>
 #include "service.hpp"
 
-class Service; // forward declaration
 
+namespace labrpc {
+
+class Service; // forward declaration
 
 /*
     Act as RPC dispatcher to route RPCs to the service (e.g. lab 2: RAFT, lab3: KV service, lab4: ShardMaster)
@@ -52,3 +54,5 @@ private:
     mutable std::mutex m_mu;                                            // mutex
     int m_count {0};                                                    // Track how many RPCs have been dispatched
 };
+
+}

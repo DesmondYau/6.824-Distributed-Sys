@@ -9,8 +9,10 @@
 #include <queue>
 #include <future>
 
-class Endpoint;                                                                        // RPC stubs for communication
-class Server;                                                                          // Represent a Raft node in the cluser
+namespace labrpc {
+
+class Endpoint;                                     // Forward declaretion. RPC stubs for communication
+class Server;                                       // Forward declaration. Represent a Raft server in the cluser
 
 struct ReplyMsg
 {
@@ -78,3 +80,5 @@ private:
     std::mutex m_mu;
     std::thread m_dispatcher;
 };
+
+}

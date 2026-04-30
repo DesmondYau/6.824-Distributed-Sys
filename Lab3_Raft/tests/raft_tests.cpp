@@ -1,8 +1,10 @@
-#include <gtest/gtest.h>
 #include "../src/config.hpp"
+#include "../src/raft.hpp"
+
 #include <thread>
 #include <chrono>
 #include <future>
+#include <gtest/gtest.h>
 
 const std::chrono::milliseconds RaftElectionTimeout(1000);
 

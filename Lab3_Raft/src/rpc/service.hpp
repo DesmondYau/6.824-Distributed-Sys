@@ -4,6 +4,7 @@
 #include <functional>
 #include <mutex>
 
+namespace labrpc{
 
 class Service {
 public:
@@ -34,3 +35,5 @@ private:
     std::unordered_map<std::string, Handler> m_methods;
     mutable std::mutex m_mu;
 };
+
+}

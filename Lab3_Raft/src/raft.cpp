@@ -7,10 +7,11 @@
 #include "persister.hpp"
 #include "logger.hpp"
 #include "./rpc/endpoint.hpp"
+#include "../include/json.hpp"
 
 
 
-Raft::Raft(const std::vector<std::shared_ptr<Endpoint>>& peers, int32_t id, std::shared_ptr<Persister> persister, 
+Raft::Raft(const std::vector<std::shared_ptr<labrpc::Endpoint>>& peers, int32_t id, std::shared_ptr<Persister> persister, 
         std::shared_ptr<ApplyChannel> applyChannel, std::shared_ptr<Logger> logger)
     : m_peers { peers }
     , m_id { id }

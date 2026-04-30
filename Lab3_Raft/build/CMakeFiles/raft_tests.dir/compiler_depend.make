@@ -1020,13 +1020,12 @@ CMakeFiles/raft_tests.dir/src/persister.cpp.o: /6.5840/Lab3_Raft/src/persister.c
 
 CMakeFiles/raft_tests.dir/src/raft.cpp.o: /6.5840/Lab3_Raft/src/raft.cpp \
   /6.5840/Lab3_Raft/include/json.hpp \
-  /6.5840/Lab3_Raft/src/rpc/endpoint.hpp \
-  /6.5840/Lab3_Raft/src/rpc/labrpc.hpp \
   /6.5840/Lab3_Raft/src/config.hpp \
   /6.5840/Lab3_Raft/src/helper.hpp \
   /6.5840/Lab3_Raft/src/logger.hpp \
   /6.5840/Lab3_Raft/src/persister.hpp \
   /6.5840/Lab3_Raft/src/raft.hpp \
+  /6.5840/Lab3_Raft/src/rpc/labrpc.hpp \
   /6.5840/Lab3_Raft/src/threadpool.hpp \
   /usr/include/alloca.h \
   /usr/include/asm-generic/errno-base.h \
@@ -1794,6 +1793,7 @@ CMakeFiles/raft_tests.dir/src/rpc/labrpc.cpp.o: /6.5840/Lab3_Raft/src/rpc/labrpc
 CMakeFiles/raft_tests.dir/tests/raft_tests.cpp.o: /6.5840/Lab3_Raft/tests/raft_tests.cpp \
   /6.5840/Lab3_Raft/src/config.hpp \
   /6.5840/Lab3_Raft/src/raft.hpp \
+  /6.5840/Lab3_Raft/src/rpc/labrpc.hpp \
   /6.5840/Lab3_Raft/src/threadpool.hpp \
   /usr/include/alloca.h \
   /usr/include/asm-generic/bitsperlong.h \
@@ -1871,6 +1871,8 @@ CMakeFiles/raft_tests.dir/tests/raft_tests.cpp.o: /6.5840/Lab3_Raft/tests/raft_t
   /usr/include/c++/13/bits/predefined_ops.h \
   /usr/include/c++/13/bits/ptr_traits.h \
   /usr/include/c++/13/bits/quoted_string.h \
+  /usr/include/c++/13/bits/random.h \
+  /usr/include/c++/13/bits/random.tcc \
   /usr/include/c++/13/bits/range_access.h \
   /usr/include/c++/13/bits/ranges_algobase.h \
   /usr/include/c++/13/bits/ranges_base.h \
@@ -1883,6 +1885,7 @@ CMakeFiles/raft_tests.dir/tests/raft_tests.cpp.o: /6.5840/Lab3_Raft/tests/raft_t
   /usr/include/c++/13/bits/shared_ptr.h \
   /usr/include/c++/13/bits/shared_ptr_atomic.h \
   /usr/include/c++/13/bits/shared_ptr_base.h \
+  /usr/include/c++/13/bits/specfun.h \
   /usr/include/c++/13/bits/sstream.tcc \
   /usr/include/c++/13/bits/std_abs.h \
   /usr/include/c++/13/bits/std_function.h \
@@ -1901,6 +1904,7 @@ CMakeFiles/raft_tests.dir/tests/raft_tests.cpp.o: /6.5840/Lab3_Raft/tests/raft_t
   /usr/include/c++/13/bits/stl_map.h \
   /usr/include/c++/13/bits/stl_multimap.h \
   /usr/include/c++/13/bits/stl_multiset.h \
+  /usr/include/c++/13/bits/stl_numeric.h \
   /usr/include/c++/13/bits/stl_pair.h \
   /usr/include/c++/13/bits/stl_queue.h \
   /usr/include/c++/13/bits/stl_raw_storage_iter.h \
@@ -1931,6 +1935,7 @@ CMakeFiles/raft_tests.dir/tests/raft_tests.cpp.o: /6.5840/Lab3_Raft/tests/raft_t
   /usr/include/c++/13/chrono \
   /usr/include/c++/13/climits \
   /usr/include/c++/13/clocale \
+  /usr/include/c++/13/cmath \
   /usr/include/c++/13/compare \
   /usr/include/c++/13/concepts \
   /usr/include/c++/13/condition_variable \
@@ -1970,12 +1975,15 @@ CMakeFiles/raft_tests.dir/tests/raft_tests.cpp.o: /6.5840/Lab3_Raft/tests/raft_t
   /usr/include/c++/13/mutex \
   /usr/include/c++/13/new \
   /usr/include/c++/13/numbers \
+  /usr/include/c++/13/numeric \
   /usr/include/c++/13/optional \
   /usr/include/c++/13/ostream \
   /usr/include/c++/13/pstl/execution_defs.h \
   /usr/include/c++/13/pstl/glue_memory_defs.h \
+  /usr/include/c++/13/pstl/glue_numeric_defs.h \
   /usr/include/c++/13/pstl/pstl_config.h \
   /usr/include/c++/13/queue \
+  /usr/include/c++/13/random \
   /usr/include/c++/13/ratio \
   /usr/include/c++/13/semaphore \
   /usr/include/c++/13/set \
@@ -1989,6 +1997,18 @@ CMakeFiles/raft_tests.dir/tests/raft_tests.cpp.o: /6.5840/Lab3_Raft/tests/raft_t
   /usr/include/c++/13/string_view \
   /usr/include/c++/13/system_error \
   /usr/include/c++/13/thread \
+  /usr/include/c++/13/tr1/bessel_function.tcc \
+  /usr/include/c++/13/tr1/beta_function.tcc \
+  /usr/include/c++/13/tr1/ell_integral.tcc \
+  /usr/include/c++/13/tr1/exp_integral.tcc \
+  /usr/include/c++/13/tr1/gamma.tcc \
+  /usr/include/c++/13/tr1/hypergeometric.tcc \
+  /usr/include/c++/13/tr1/legendre_function.tcc \
+  /usr/include/c++/13/tr1/modified_bessel_func.tcc \
+  /usr/include/c++/13/tr1/poly_hermite.tcc \
+  /usr/include/c++/13/tr1/poly_laguerre.tcc \
+  /usr/include/c++/13/tr1/riemann_zeta.tcc \
+  /usr/include/c++/13/tr1/special_function_util.h \
   /usr/include/c++/13/tuple \
   /usr/include/c++/13/type_traits \
   /usr/include/c++/13/typeinfo \
@@ -2011,6 +2031,7 @@ CMakeFiles/raft_tests.dir/tests/raft_tests.cpp.o: /6.5840/Lab3_Raft/tests/raft_t
   /usr/include/linux/stddef.h \
   /usr/include/linux/types.h \
   /usr/include/locale.h \
+  /usr/include/math.h \
   /usr/include/pthread.h \
   /usr/include/regex.h \
   /usr/include/sched.h \
@@ -2044,12 +2065,21 @@ CMakeFiles/raft_tests.dir/tests/raft_tests.cpp.o: /6.5840/Lab3_Raft/tests/raft_t
   /usr/include/x86_64-linux-gnu/bits/errno.h \
   /usr/include/x86_64-linux-gnu/bits/floatn-common.h \
   /usr/include/x86_64-linux-gnu/bits/floatn.h \
+  /usr/include/x86_64-linux-gnu/bits/flt-eval-method.h \
+  /usr/include/x86_64-linux-gnu/bits/fp-fast.h \
+  /usr/include/x86_64-linux-gnu/bits/fp-logb.h \
   /usr/include/x86_64-linux-gnu/bits/getopt_core.h \
   /usr/include/x86_64-linux-gnu/bits/getopt_posix.h \
+  /usr/include/x86_64-linux-gnu/bits/iscanonical.h \
   /usr/include/x86_64-linux-gnu/bits/libc-header-start.h \
+  /usr/include/x86_64-linux-gnu/bits/libm-simd-decl-stubs.h \
   /usr/include/x86_64-linux-gnu/bits/local_lim.h \
   /usr/include/x86_64-linux-gnu/bits/locale.h \
   /usr/include/x86_64-linux-gnu/bits/long-double.h \
+  /usr/include/x86_64-linux-gnu/bits/math-vector.h \
+  /usr/include/x86_64-linux-gnu/bits/mathcalls-helper-functions.h \
+  /usr/include/x86_64-linux-gnu/bits/mathcalls-narrow.h \
+  /usr/include/x86_64-linux-gnu/bits/mathcalls.h \
   /usr/include/x86_64-linux-gnu/bits/posix1_lim.h \
   /usr/include/x86_64-linux-gnu/bits/posix2_lim.h \
   /usr/include/x86_64-linux-gnu/bits/posix_opt.h \
@@ -2147,6 +2177,7 @@ CMakeFiles/raft_tests.dir/tests/raft_tests.cpp.o: /6.5840/Lab3_Raft/tests/raft_t
   /usr/include/x86_64-linux-gnu/c++/13/bits/gthr-default.h \
   /usr/include/x86_64-linux-gnu/c++/13/bits/gthr.h \
   /usr/include/x86_64-linux-gnu/c++/13/bits/messages_members.h \
+  /usr/include/x86_64-linux-gnu/c++/13/bits/opt_random.h \
   /usr/include/x86_64-linux-gnu/c++/13/bits/os_defines.h \
   /usr/include/x86_64-linux-gnu/c++/13/bits/time_members.h \
   /usr/include/x86_64-linux-gnu/gnu/stubs-64.h \

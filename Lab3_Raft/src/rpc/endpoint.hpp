@@ -3,9 +3,9 @@
 #include <string>
 #include "labrpc.hpp"
 #include "../helper.hpp"
-#include "../raft.hpp"
 #include "../../include/json.hpp"
 
+namespace labrpc{
 
 class Endpoint {
 public:
@@ -59,3 +59,5 @@ private:
     std::string m_endpointName;
     std::weak_ptr<Network> m_network;
 };
+
+}

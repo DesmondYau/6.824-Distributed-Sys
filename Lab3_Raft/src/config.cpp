@@ -1,12 +1,15 @@
 #include "config.hpp"
+
+// Implementation headers
 #include "raft.hpp"
 #include "helper.hpp"
 #include "persister.hpp"
 #include "logger.hpp"
-#include "rpc/labrpc.hpp"
+#include "json.hpp"
 #include "rpc/server.hpp"
 #include "rpc/service.hpp"
-#include "../include/json.hpp"
+
+// Standard library
 #include <iostream>
 #include <thread>
 #include <stdexcept>
@@ -16,7 +19,7 @@
 
 Config::Config(int num, bool unreliable)
     : m_num { num }
-    , m_network (std::make_shared<Network>())
+    , m_network (std::make_shared<labrpc::Network>())
     , m_rafts(num)
     , m_connected(num , false)
     , m_persisters(num)
@@ -89,7 +92,7 @@ void Config::startServer(int i)
     
     // Generate fresh endpoint names for outgoing RPCs
     m_endpointNames[i] = std::vector<std::string>(m_num);
-    std::vector<std::shared_ptr<Endpoint>> endpoints(m_num);
+    std::vector<std::shared_ptr<labrpc::Endpoint>> endpoints(m_num);
     for (int j{0}; j<m_num; j++)
     {
         m_endpointNames[i][j] = "From_" + std::to_string(i) + "_To_" + std::to_string(j);
@@ -158,7 +161,7 @@ void Config::startServer(int i)
 
         
     // wrap Raft in a Service
-    auto raftService = std::make_shared<Service>("Raft");
+    auto raftService = std::make_shared<labrpc::Service>("Raft");
 
 
     // Rgister RPC methods to the Service (which would be called by dispatch method later on)
@@ -188,7 +191,7 @@ void Config::startServer(int i)
         });
 
     // Create a Server and attach Service to Server
-    auto server = std::make_shared<Server>();
+    auto server = std::make_shared<labrpc::Server>();
     server->addService("Raft", raftService);
 
     // Add Server to network

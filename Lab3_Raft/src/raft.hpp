@@ -11,8 +11,12 @@
 #include <chrono>
 #include "threadpool.hpp"
 
+
+namespace labrpc {
+    class Endpoint;
+}
+
 class Persister;
-class Endpoint;
 class ApplyChannel;
 class Logger;
 
@@ -83,7 +87,7 @@ public:
     };
 
 
-    Raft(const std::vector<std::shared_ptr<Endpoint>>& peers, int32_t id, std::shared_ptr<Persister> persister, 
+    Raft(const std::vector<std::shared_ptr<labrpc::Endpoint>>& peers, int32_t id, std::shared_ptr<Persister> persister, 
         std::shared_ptr<ApplyChannel>applyChannel, std::shared_ptr<Logger> logger);
     ~Raft();
 
@@ -131,7 +135,7 @@ private:
     std::vector<std::shared_ptr<LogEntry>> m_logs {};
     std::vector<uint64_t> m_nextindex {};
     std::vector<uint64_t> m_matchIndex {};
-    std::vector<std::shared_ptr<Endpoint>> m_peers {};                              // Vector of RPC endpoint of all peers in the network
+    std::vector<std::shared_ptr<labrpc::Endpoint>> m_peers {};                              // Vector of RPC endpoint of all peers in the network
     std::shared_ptr<Persister> m_persister {};                                      // Persister
     std::shared_ptr<ApplyChannel> m_applyChannel {};                                // ApplyChannel tfor sending ApplyMsg for each newly committed log entry   
     std::shared_ptr<Logger> m_logger {};
